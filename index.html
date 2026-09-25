@@ -113,7 +113,7 @@
 
   <div class="card">
     <h1>1600 × 1200 Image Resizer</h1>
-    <p>Upload any image. Smaller images will be padded with black to fit 1600×1200. Larger images will be scaled down proportionally to fit inside.</p>
+    <p>Upload any image. It's fit to 1600px on its longest side and 1200px on its shortest side (landscape → 1600×1200, portrait → 1200×1600), padded with black, and centered.</p>
 
     <div class="dropzone" id="dropzone">
       <div>📁 Click or Drag & Drop Image Here</div>
@@ -143,8 +143,8 @@
     const statusInfo = document.getElementById('statusInfo');
     const iosHint = document.getElementById('iosHint');
 
-    const TARGET_WIDTH = 1600;
-    const TARGET_HEIGHT = 1200;
+    const LONG_SIDE = 1600;
+    const SHORT_SIDE = 1200;
 
     // Detect iOS (including iPadOS, which reports as "Mac" but has touch support)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
