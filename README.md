@@ -1,0 +1,1 @@
+# resize_for_comp
