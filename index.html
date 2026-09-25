@@ -122,7 +122,7 @@
 
     <div id="preview-container">
       <canvas id="canvas" width="1600" height="1200"></canvas>
-      <div class="info" id="statusInfo">Dimensions: 1600 x 1200 px</div>
+      <div class="info" id="statusInfo">Dimensions: 1600 x 1200 px (or 1200 x 1600 for portrait)</div>
       <br>
       <div class="actions">
         <a id="downloadBtn" class="btn" download="resized-1600x1200.png">Download Image</a>
@@ -183,48 +183,75 @@
         return;
       }
 
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
+      const reader = new FileReader();
 
-      img.onload = () => {
+      reader.onerror = () => {
+        alert('Could not read that file. Please try a different image.');
+      };
+
+      reader.onload = () => {
+        const img = new Image();
+
+        img.onerror = () => {
+          alert('Could not load that image. The file may be corrupted or in an unsupported format.');
+        };
+
+        img.onload = () => {
+          renderImage(img, file.name);
+        };
+
+        img.src = reader.result;
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    function renderImage(img, fileName) {
+        // Orient the target canvas to match the image: landscape (or square)
+        // images get a 1600x1200 canvas, portrait images get 1200x1600, so
+        // the longest side always maps to 1600 and the shortest to 1200.
+        const isPortrait = img.height > img.width;
+        const targetWidth = isPortrait ? SHORT_SIDE : LONG_SIDE;
+        const targetHeight = isPortrait ? LONG_SIDE : SHORT_SIDE;
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
         // Clear canvas and set black background
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+        ctx.fillRect(0, 0, targetWidth, targetHeight);
 
         let drawWidth = img.width;
         let drawHeight = img.height;
 
         // Scale down if image is larger than target canvas in any dimension
-        if (drawWidth > TARGET_WIDTH || drawHeight > TARGET_HEIGHT) {
-          const scale = Math.min(TARGET_WIDTH / drawWidth, TARGET_HEIGHT / drawHeight);
+        if (drawWidth > targetWidth || drawHeight > targetHeight) {
+          const scale = Math.min(targetWidth / drawWidth, targetHeight / drawHeight);
           drawWidth = drawWidth * scale;
           drawHeight = drawHeight * scale;
         }
 
         // Calculate centering coordinates
-        const x = (TARGET_WIDTH - drawWidth) / 2;
-        const y = (TARGET_HEIGHT - drawHeight) / 2;
+        const x = (targetWidth - drawWidth) / 2;
+        const y = (targetHeight - drawHeight) / 2;
 
         // Draw image onto canvas
         ctx.drawImage(img, x, y, drawWidth, drawHeight);
 
-        // If the image is padded (doesn't fill the full 1600x1200 canvas),
-        // outline it with a 1px border so the edge is visible against the black.
-        const isPadded = drawWidth < TARGET_WIDTH || drawHeight < TARGET_HEIGHT;
+        // If the image is padded (doesn't fill the full canvas), outline it
+        // with a 1px border so the edge is visible against the black.
+        const isPadded = drawWidth < targetWidth || drawHeight < targetHeight;
         if (isPadded) {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1;
           ctx.strokeRect(x + 0.5, y + 0.5, drawWidth - 1, drawHeight - 1);
         }
 
-        currentFileName = `resized_${file.name.replace(/\.[^/.]+$/, "")}.png`;
-        statusInfo.textContent = `Original: ${img.width}x${img.height} → Canvas: 1600x1200 (Centered & Padded)`;
+        currentFileName = `resized_${fileName.replace(/\.[^/.]+$/, "")}.png`;
+        statusInfo.textContent = `Original: ${img.width}x${img.height} → Canvas: ${targetWidth}x${targetHeight} (Centered & Padded)`;
         previewContainer.style.display = 'block';
 
         updateDownloadOptions();
-
-        URL.revokeObjectURL(img.src);
-      };
     }
 
     let currentBlob = null;
