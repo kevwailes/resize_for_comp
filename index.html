@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Resizer (1600x1200)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background-color: #1e293b;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      color: #f8fafc;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+    .dropzone {
+      border: 2px dashed #475569;
+      border-radius: 8px;
+      padding: 40px 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background-color: #0f172a;
+    }
+    .dropzone:hover {
+      border-color: #38bdf8;
+      background-color: #1e293b;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    .btn {
+      background-color: #0284c7;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: inline-block;
+      margin-top: 16px;
+      text-decoration: none;
+    }
+    .btn:hover {
+      background-color: #0369a1;
+    }
+    .btn:disabled {
+      background-color: #475569;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background-color: #334155;
+    }
+    .btn-secondary:hover {
+      background-color: #475569;
+    }
+    #preview-container {
+      margin-top: 24px;
+      display: none;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background-color: #000;
+    }
+    .info {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #38bdf8;
+    }
+    .hint {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      display: none;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>1600 × 1200 Image Resizer</h1>
+    <p>Upload any image. Smaller images will be padded with black to fit 1600×1200. Larger images will be scaled down proportionally to fit inside.</p>
+
+    <div class="dropzone" id="dropzone">
+      <div>📁 Click or Drag & Drop Image Here</div>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div id="preview-container">
+      <canvas id="canvas" width="1600" height="1200"></canvas>
+      <div class="info" id="statusInfo">Dimensions: 1600 x 1200 px</div>
+      <br>
+      <div class="actions">
+        <a id="downloadBtn" class="btn" download="resized-1600x1200.png">Download Image</a>
+        <button id="shareBtn" class="btn btn-secondary" style="display:none;">Save / Share Image</button>
+        <div class="hint" id="iosHint">On iPhone: tap "Save / Share Image" above, then choose "Save Image" in the share sheet. (Or long-press the image below and choose "Save Image".)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const previewContainer = document.getElementById('preview-container');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const statusInfo = document.getElementById('statusInfo');
+    const iosHint = document.getElementById('iosHint');
+
+    const TARGET_WIDTH = 1600;
+    const TARGET_HEIGHT = 1200;
+
+    // Detect iOS (including iPadOS, which reports as "Mac" but has touch support)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    let currentFileName = 'resized-1600x1200.png';
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '#38bdf8';
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.borderColor = '#475569';
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = '#475569';
+      if (e.dataTransfer.files.length) {
+        processImage(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        processImage(e.target.files[0]);
+      }
+    });
+
+    function processImage(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+      }
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+
+      img.onload = () => {
+        // Clear canvas and set black background
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+
+        let drawWidth = img.width;
+        let drawHeight = img.height;
+
+        // Scale down if image is larger than target canvas in any dimension
+        if (drawWidth > TARGET_WIDTH || drawHeight > TARGET_HEIGHT) {
+          const scale = Math.min(TARGET_WIDTH / drawWidth, TARGET_HEIGHT / drawHeight);
+          drawWidth = drawWidth * scale;
+          drawHeight = drawHeight * scale;
+        }
+
+        // Calculate centering coordinates
+        const x = (TARGET_WIDTH - drawWidth) / 2;
+        const y = (TARGET_HEIGHT - drawHeight) / 2;
+
+        // Draw image onto canvas
+        ctx.drawImage(img, x, y, drawWidth, drawHeight);
+
+        // If the image is padded (doesn't fill the full 1600x1200 canvas),
+        // outline it with a 1px border so the edge is visible against the black.
+        const isPadded = drawWidth < TARGET_WIDTH || drawHeight < TARGET_HEIGHT;
+        if (isPadded) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, drawWidth - 1, drawHeight - 1);
+        }
+
+        currentFileName = `resized_${file.name.replace(/\.[^/.]+$/, "")}.png`;
+        statusInfo.textContent = `Original: ${img.width}x${img.height} → Canvas: 1600x1200 (Centered & Padded)`;
+        previewContainer.style.display = 'block';
+
+        updateDownloadOptions();
+
+        URL.revokeObjectURL(img.src);
+      };
+    }
+
+    let currentBlob = null;
+
+    function updateDownloadOptions() {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        currentBlob = blob;
+
+        // Regular download link, using a Blob URL instead of a data URI.
+        // More reliable across browsers than toDataURL().
+        const blobUrl = URL.createObjectURL(blob);
+        downloadBtn.href = blobUrl;
+        downloadBtn.download = currentFileName;
+
+        // On iOS, prefer the native Web Share sheet, which actually works
+        // for saving images to Photos/Files.
+        const file = new File([blob], currentFileName, { type: 'image/png' });
+        const canUseShare = navigator.canShare && navigator.canShare({ files: [file] });
+
+        if (isIOS && canUseShare) {
+          shareBtn.style.display = 'inline-block';
+          iosHint.style.display = 'block';
+          shareBtn.onclick = async () => {
+            try {
+              await navigator.share({
+                files: [file],
+                title: currentFileName
+              });
+            } catch (err) {
+              // User cancelled or share failed silently; no action needed.
+            }
+          };
+        } else if (isIOS) {
+          // iOS but Web Share with files isn't supported (older Safari) —
+          // fall back to long-press instructions only.
+          shareBtn.style.display = 'none';
+          iosHint.textContent = 'On iPhone: long-press the image above and choose "Save Image" to save it to Photos.';
+          iosHint.style.display = 'block';
+        } else {
+          shareBtn.style.display = 'none';
+          iosHint.style.display = 'none';
+        }
+      }, 'image/png');
+    }
+  </script>
+</body>
+</html>
